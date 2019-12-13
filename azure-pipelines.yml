@@ -22,5 +22,30 @@ steps:
     php -version
   displayName: 'Use PHP version $(phpVersion)'
 
-- script: composer install --no-interaction --prefer-dist
+- script: |
+    composer self-update
+    composer install --no-interaction --no-progress
   displayName: 'composer install'
+
+
+- script: cp .env.testing .env
+  displayName: 'Laravel: ENV configuration'
+
+- script: |
+    php artisan key:generate
+    php artisan config:clear
+    php artisan migrate:refresh
+    php artisan db:seed --env="testing"
+  displayName: 'Laravel: Generate an application key, Re-cache, migrate'
+
+- script: vendor/bin/phpmd app/ text phpmd.xml
+  displayName: 'Using the PHP Code Mess Detection'
+
+- script: vendor/bin/phpcbf --standard=psr2 app/
+  displayName: 'Using the PHP Code Beautifier and Fixer'
+
+- script: vendor/bin/phpcs
+  displayName: 'Using the PHP Code Sniffer'
+
+- script: vendor/bin/phpunit --colors --debug
+  displayName: 'Running PHPUnit test'
