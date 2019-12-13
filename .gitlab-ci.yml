@@ -1,0 +1,93 @@
+#
+# Gitlab CI configuration for the Laravel Framework.
+#
+image: connectivdocker/php:7.3
+
+# Pick zero or more services to be used on all builds.
+# Only needed when using a docker container to run your tests in.
+# Check out: http://docs.gitlab.com/ce/ci/docker/using_docker_images.html#what-is-a-service
+services:
+  - mysql:5.7
+
+# This folder is cached between builds
+# http://docs.gitlab.com/ce/ci/yaml/README.html#cache
+cache:
+  paths:
+    - vendor/
+    - node_modules/
+
+variables:
+  DB_HOST: mysql
+  MYSQL_DATABASE: laradev
+  DB_USERNAME: root
+  MYSQL_ROOT_PASSWORD: t00r3
+
+stages:
+  - test
+  - deploy
+
+unit_test:
+  stage: test
+  environment:
+    # coding convention check コーディング規約チェック
+    name: testing-environment
+    url: https://laradev.tk
+  before_script:
+    # Install packages through composer
+    - composer self-update
+    - composer install --no-progress --no-interaction
+
+    # ENV configuration
+    - cp .env.testing .env
+
+    # Laravel: Generate an application key. Re-cache. migrate
+    - php artisan key:generate
+    - php artisan config:clear
+    - php artisan migrate:refresh
+    - php artisan db:seed --env="testing"
+
+  script:
+    # Mess Detection
+    - vendor/bin/phpmd app/ text phpmd.xml
+
+    # Code Beautifier and Fixer
+    # Using the PHP Code Beautifier and Fixer
+    # https://github.com/squizlabs/PHP_CodeSniffer/wiki/Fixing-Errors-Automatically#using-the-php-code-beautifier-and-fixer
+    - vendor/bin/phpcbf --standard=psr2 app/
+
+    # PHP Code Sniffer
+    # only folder app
+    - vendor/bin/phpcs
+    # - vendor/bin/phpcs --standard=psr2 --ignore=vendor,bootstrap/cache/,storage,database,*.js,*.css,public/index.php,*.blade.php ./
+
+    # PHPUnit
+    - echo "Running PHPUnit test...."
+    - vendor/bin/phpunit --colors --debug
+
+deploy_staging:
+  stage: deploy
+  only:
+    - staging
+  environment:
+    # coding convention check コーディング規約チェック
+    name: staging-environment
+    url: https://laradev.tk
+  before_script:
+    # Update packages
+    - apk update
+    # Run ssh-agent in background:
+    - 'which ssh-agent || ( apk add openssh-client -yqq )'
+    - mkdir -p ~/.ssh
+    # - echo "$SSH_PRIVATE_KEY"
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+    - eval $(ssh-agent -s)
+    - ssh-add ~/.ssh/id_rsa
+    - ssh-add -l
+  script:
+    - echo "Deploying........."
+    # - ~/.composer/vendor/bin/envoy run deploy --commit="$CI_COMMIT_SHA"
+
+  when: manual
+

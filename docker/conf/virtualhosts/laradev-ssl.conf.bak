@@ -1,0 +1,25 @@
+<IfModule mod_ssl.c>
+    # laradev
+    <VirtualHost *:443>
+        ServerName laradev.tk
+        
+        VirtualDocumentRoot /var/www/html/%0/public
+
+        <FilesMatch "\.php$">
+            SetHandler "proxy:fcgi://php73:9000"
+        </FilesMatch>
+
+        <Directory /var/www/html/%0/public/>
+            Options FollowSymLinks -Indexes
+            AllowOverride All
+            Require all granted
+        </Directory>
+        
+        SSLEngine on
+        SSLCertificateFile    /etc/apache2/ssl/apache.crt
+        SSLCertificateKeyFile /etc/apache2/ssl/apache.key
+        
+        ErrorLog ${APACHE_LOG_DIR}/laradev-error.log
+        CustomLog ${APACHE_LOG_DIR}/laradev-access.log combined
+    </VirtualHost>
+</IfModule>

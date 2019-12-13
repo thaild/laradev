@@ -1,0 +1,51 @@
+version: "2"
+
+services:
+  php73:
+    image: connectivdocker/php:7.3
+    container_name: laradev-php73
+    networks:
+      internal:
+    links:
+    - mysql
+    volumes:
+    - ./:/var/www/html/laradev.tk
+    restart: always
+
+  httpd:
+    image: httpd:2.4.33-alpine
+    container_name: laradev-httpd
+    networks:
+      internal:
+        ipv4_address: 172.23.0.89
+    volumes:
+    - ./docker/conf/httpd.conf:/usr/local/apache2/conf/httpd.conf
+    - ./docker/conf/virtualhosts:/usr/local/apache2/conf/extra/vhosts
+    - ./docker/conf/ssl:/usr/local/apache2/ssl
+    - ./docker/logs/httpd:/var/log/httpd
+    links:
+    - php73
+    volumes_from:
+    - php73
+    restart: always
+
+  mysql:
+    image: connectivdocker/mysql
+    container_name: laradev-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: t00r3
+      MYSQL_USER: docker
+      MYSQL_PASSWORD: docker
+      MYSQL_DATABASE: laradev
+    networks:
+      internal:
+        ipv4_address: 172.23.0.3
+    volumes:
+      - ./docker/database:/var/lib/mysql
+    restart: always
+
+networks:
+  internal:
+    ipam:
+      config:
+        - subnet: 172.23.0.0/16
