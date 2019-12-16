@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\User;
 use Illuminate\Foundation\Auth\RegistersUsers;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+// 追加
+use Illuminate\Auth\AuthManager;
+use Illuminate\Http\Request;
+use Illuminate\Auth\Events\Registered;
 
 class RegisterController extends Controller
 {
@@ -31,13 +34,49 @@ class RegisterController extends Controller
     protected $redirectTo = '/home';
 
     /**
+     * $authManager instance
+     *
+     * @var object
+     */
+    protected $authManager;
+
+    /**
      * Create a new controller instance.
      *
-     * @return void
+     * @param AuthManager $authManager
      */
-    public function __construct()
+    public function __construct(AuthManager $authManager)
     {
         $this->middleware('guest');
+
+        // CognitoのGuardを読み込む
+        $this->authManager = $authManager;
+    }
+
+    /**
+     * register user
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector|void
+     */
+    public function register(Request $request)
+    {
+        $data = $request->all();
+
+        $this->validator($data)->validate();
+
+        // Cognito側の新規登録
+        $username = $this->authManager->register(
+            $data['email'],
+            $data['password'],
+            [
+                'email' => $data['email'],
+            ]
+        );
+
+        // Laravel側の新規登録
+        event(new Registered($user = $this->create($data, $username)));
+        return $this->registered($request, $user) ?: redirect($this->redirectPath());
     }
 
     /**
@@ -49,8 +88,7 @@ class RegisterController extends Controller
     protected function validator(array $data)
     {
         return Validator::make($data, [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users', 'cognito_user_unique'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
     }
@@ -58,15 +96,15 @@ class RegisterController extends Controller
     /**
      * Create a new user instance after a valid registration.
      *
-     * @param  array  $data
+     * @param array $data
+     * @param $username
      * @return \App\User
      */
-    protected function create(array $data)
+    protected function create(array $data, $username)
     {
         return User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
+            'cognito_username' => $username,
+            'email' => $data['email']
         ]);
     }
 }
