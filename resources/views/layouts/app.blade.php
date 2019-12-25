@@ -21,6 +21,7 @@
 </head>
 <body>
     <div id="app">
+        @include('flash::message')
         <nav class="navbar navbar-expand-md navbar-light bg-white shadow-sm">
             <div class="container">
                 <a class="navbar-brand" href="{{ url('/') }}">
@@ -61,6 +62,12 @@
                                         {{ __('Logout') }}
                                     </a>
 
+                                    @if(Auth::user()->isImpersonating())
+                                    <a class="dropdown-item" href="{{ action('UserController@stopImpersonate') }}">
+                                        {{ __('Stop Impersonate') }}
+                                    </a>
+                                    @endif
+
                                     <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
                                         @csrf
                                     </form>
@@ -76,5 +83,8 @@
             @yield('content')
         </main>
     </div>
+    <script>
+        $('#flash-overlay-modal').modal();
+    </script>
 </body>
 </html>
